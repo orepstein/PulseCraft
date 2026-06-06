@@ -1,53 +1,64 @@
-# To learn more about how to use Nix to configure your environment
-# see: https://developers.google.com/idx/guides/customize-idx-env
 { pkgs, ... }: {
-  # Which nixpkgs channel to use.
-  channel = "stable-24.11"; # or "unstable"
-  # Use https://search.nixos.org/packages to find packages
+  channel = "stable-24.11";
+
   packages = [
-    # pkgs.go
-    # pkgs.python311
-    # pkgs.python311Packages.pip
-    # pkgs.nodejs_22
-    # pkgs.nodePackages.nodemon
+    pkgs.nodejs_20
+    pkgs.openssl
+    pkgs.curl
+    pkgs.postgresql
+    pkgs.redis
   ];
-  # Sets environment variables in the workspace
-  env = {};
+
+  env = {
+    RABBITMQ_URL = "amqps://fqhtvebf:zmIU1ZA046Jr4WCoU4y--ldbl6bUIqwu@whale.rmq.cloudamqp.com/fqhtvebf";
+  };
+
   idx = {
-    # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
     extensions = [
-      # "vscodevim.vim"
-      "google.gemini-cli-vscode-ide-companion"
+      "google.gemini-cli-vscode-idx-companion"
+      "prisma.prisma"
     ];
-    # Enable previews
-    previews = {
-      enable = true;
-      previews = {
-        # web = {
-        #   # Example: run "npm run dev" with PORT set to IDX's defined port for previews,
-        #   # and show it in IDX's web preview panel
-        #   command = ["npm" "run" "dev"];
-        #   manager = "web";
-        #   env = {
-        #     # Environment variables to set for your server
-        #     PORT = "$PORT";
-        #   };
-        # };
-      };
-    };
-    # Workspace lifecycle hooks
+
     workspace = {
-      # Runs when a workspace is first created
       onCreate = {
-        # Example: install JS dependencies from NPM
-        # npm-install = "npm install";
-        # Open editors for the following files by default, if they exist:
-        default.openFiles = [ ".idx/dev.nix" "README.md" ];
+        install-deps = "npm i -C backend && npm i -C worker";
       };
-      # Runs when the workspace is (re)started
       onStart = {
-        # Example: start a background task to watch and re-build backend code
-        # watch-backend = "npm run watch-backend";
+        start-redis = "redis-server --daemonize yes";
+        
+        start-postgres-and-db = ''
+          DB_DIR="$PWD/db"
+          mkdir -p "$DB_DIR"
+          rm -f "$DB_DIR/postmaster.pid"
+          
+          if [ ! -f "$DB_DIR/PG_VERSION" ]; then
+            initdb -D "$DB_DIR"
+          fi
+          
+          if ! grep -q "listen_addresses = 'localhost'" "$DB_DIR/postgresql.conf"; then
+            echo "listen_addresses = 'localhost'" >> "$DB_DIR/postgresql.conf"
+          fi
+          
+          SOCKET_DIR_CONFIG="unix_socket_directories = '$DB_DIR'"
+          if ! grep -q "unix_socket_directories" "$DB_DIR/postgresql.conf"; then
+            echo "$SOCKET_DIR_CONFIG" >> "$DB_DIR/postgresql.conf"
+          else
+            sed -i "s|.*unix_socket_directories.*|$SOCKET_DIR_CONFIG|" "$DB_DIR/postgresql.conf"
+          fi
+          
+          pg_ctl -D "$DB_DIR" -l "$DB_DIR/logfile" start
+          
+          while ! pg_isready -h localhost -q; do
+            sleep 1
+          done
+          
+          if ! psql -h localhost -lqt | cut -d \| -f 1 | grep -qw analytics_db; then
+            createdb -h localhost analytics_db
+          fi
+        '';
+        
+        start-backend = "cd backend && export RABBITMQ_URL=\"amqps://fqhtvebf:zmIU1ZA046Jr4WCoU4y--ldbl6bUIqwu@whale.rmq.cloudamqp.com/fqhtvebf\" && npm start &";
+        start-worker = "cd worker && export DATABASE_URL=\"postgresql://user:@localhost:5432/analytics_db\" && export RABBITMQ_URL=\"amqps://fqhtvebf:zmIU1ZA046Jr4WCoU4y--ldbl6bUIqwu@whale.rmq.cloudamqp.com/fqhtvebf\" && npx prisma migrate deploy && npm start &";
       };
     };
   };
