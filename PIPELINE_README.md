@@ -1,4 +1,4 @@
-# RealTimeDash - Data Pipeline Architecture
+# PulseCraft - Data Pipeline Architecture
 
 ## The Flow
 `[HTTP POST]` -> **Backend** (Port 3000) -> **CloudAMQP** (RabbitMQ) -> **Worker** -> **PostgreSQL** (analytics_db)
