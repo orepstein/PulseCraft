@@ -11,7 +11,7 @@
       const adapter = new PrismaPg(pool);
       const prisma = new PrismaClient({ adapter });
       
-      const redis = new Redis(process.env.REDIS_URL as string); // Connect to Redis using the environment variable
+      const redis = new Redis(process.env.REDIS_URL as string, { tls: { rejectUnauthorized: false } });
       const QUEUE_NAME = 'events_queue';
       const RABBITMQ_URL = process.env.RABBITMQ_URL;
       
@@ -34,7 +34,7 @@
               await prisma.event.create({
                 data: {
                   userId: payload.user_id,
-                  eventType: payload.event_type, // Correctly assign event_type from the payload
+                  eventType: payload.event_type,
                   payload: payload
                 }
               });
@@ -45,7 +45,7 @@
               // Bonus: counter by event type
               await redis.hincrby('event_types_stats', payload.event_type, 1);
       
-              console.log(\`[v] Event processed: ${payload.event_type}\`);
+              console.log(\'[v] Event processed: ${payload.event_type}\');
               channel.ack(msg);
             } catch (err) {
               console.error("Processing error:", err);
