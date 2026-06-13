@@ -45,7 +45,7 @@
               // Bonus: counter by event type
               await redis.hincrby('event_types_stats', payload.event_type, 1);
       
-              console.log(\'[v] Event processed: ${payload.event_type}\');
+              console.log(`[v] Event processed: ${payload.event_type}`);
               channel.ack(msg);
             } catch (err) {
               console.error("Processing error:", err);
