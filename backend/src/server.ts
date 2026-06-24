@@ -1,4 +1,3 @@
-
 import fastify from 'fastify';
 import amqp from 'amqplib';
 import fs from 'fs';
@@ -36,7 +35,7 @@ server.post('/api/events', async (req, reply) => {
 
 const start = async () => {
     await connect();
-    await server.listen({ port: 3000, host: '0.0.0.0' });
+    await server.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });
     console.log('Server running on 3000');
 };
 start();
