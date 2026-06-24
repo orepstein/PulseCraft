@@ -1,3 +1,4 @@
+
 import fastify from 'fastify';
 import amqp from 'amqplib';
 import fs from 'fs';

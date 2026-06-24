@@ -1,57 +1,66 @@
-      import * as dotenv from 'dotenv';
-      dotenv.config();
-      
-      import amqp from 'amqplib';
-      import { PrismaClient } from '@prisma/client';
-      import Redis from 'ioredis';
-      import { Pool } from 'pg';
-      import { PrismaPg } from '@prisma/adapter-pg';
-      
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-      const adapter = new PrismaPg(pool);
-      const prisma = new PrismaClient({ adapter });
-      
-      const redis = new Redis(process.env.REDIS_URL as string, { tls: { rejectUnauthorized: false } });
-      const QUEUE_NAME = 'events_queue';
-      const RABBITMQ_URL = process.env.RABBITMQ_URL;
-      
-      async function startWorker() {
-        if (!RABBITMQ_URL) {
-          throw new Error("RABBITMQ_URL is not defined in environment variables.");
-        }
-        const connection = await amqp.connect(RABBITMQ_URL);
-        const channel = await connection.createChannel();
-        await channel.assertQueue(QUEUE_NAME, { durable: true });
-      
-        console.log("Worker is listening and connected to Redis & DB");
-      
-        channel.consume(QUEUE_NAME, async (msg) => {
-          if (msg !== null) {
-            const payload = JSON.parse(msg.content.toString());
-      
-            try {
-              // 1. Save to Postgres
-              await prisma.event.create({
-                data: {
-                  userId: payload.user_id,
-                  eventType: payload.event_type,
-                  payload: payload
-                }
-              });
-      
-              // 2. Increment a counter in Redis (e.g., a general counter)
-              await redis.incr('total_events_count');
-              
-              // Bonus: counter by event type
-              await redis.hincrby('event_types_stats', payload.event_type, 1);
-      
-              console.log(`[v] Event processed: ${payload.event_type}`);
-              channel.ack(msg);
-            } catch (err) {
-              console.error("Processing error:", err);
-            }
-          }
-        });
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import amqp from 'amqplib';
+import * as admin from 'firebase-admin';
+
+// --- Firebase Initialization ---
+// This code expects a FIREBASE_SERVICE_ACCOUNT_JSON environment variable
+// containing the stringified service account key from Firebase.
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  throw new Error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.");
+}
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+console.log("Successfully connected to Firebase/Firestore.");
+// --------------------------------
+
+// --- RabbitMQ Configuration ---
+const QUEUE_NAME = 'events_queue';
+const RABBITMQ_URL = process.env.RABBITMQ_URL;
+// --------------------------------
+
+async function startWorker() {
+  if (!RABBITMQ_URL) {
+    throw new Error("RABBITMQ_URL is not defined in environment variables.");
+  }
+
+  const connection = await amqp.connect(RABBITMQ_URL);
+  const channel = await connection.createChannel();
+  await channel.assertQueue(QUEUE_NAME, { durable: true });
+
+  console.log(`Worker is listening for messages on queue: "${QUEUE_NAME}"`);
+
+  channel.consume(QUEUE_NAME, async (msg) => {
+    if (msg !== null) {
+      const eventPayload = JSON.parse(msg.content.toString());
+      console.log(`[i] Received event of type: ${eventPayload.event_type}`);
+
+      try {
+        // Save the entire event payload to the 'events' collection in Firestore
+        const docRef = await db.collection('events').add(eventPayload);
+        
+        console.log(`[v] Event successfully saved to Firestore with document ID: ${docRef.id}`);
+        
+        // Acknowledge the message so RabbitMQ removes it from the queue
+        channel.ack(msg);
+
+      } catch (error) {
+        console.error("[-] Error writing event to Firestore:", error);
+        // In case of an error, we reject the message without requeueing it
+        // to prevent an infinite loop of failures.
+        channel.nack(msg, false, false);
       }
-      
-      startWorker();
+    }
+  });
+}
+
+startWorker().catch(error => {
+    console.error("Worker failed to start:", error);
+    process.exit(1);
+});
