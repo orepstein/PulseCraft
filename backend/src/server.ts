@@ -1,53 +1,41 @@
 import fastify from 'fastify';
 import amqp from 'amqplib';
+import fs from 'fs';
+import path from 'path';
 
 const server = fastify();
 
-// Read the RabbitMQ URL from environment variables, with a fallback for local development
-const RABBITMQ_URL = process.env.RABBITMQ_URL;
-const QUEUE_NAME = 'events_queue';
+// CORS
+server.addHook('preHandler', (req, reply, done) => {
+  reply.header('Access-Control-Allow-Origin', '*');
+  done();
+});
 
+// הגשת ה-HTML
+server.get('/', (req, reply) => {
+  return reply.type('text/html').send(fs.readFileSync(path.join(__dirname, '../../frontend/index.html')));
+});
+
+const RABBITMQ_URL = process.env.RABBITMQ_URL || '';
+const QUEUE_NAME = 'events_queue';
 let channel: amqp.Channel;
 
-async function connectToRabbitMQ() {
-  try {
-    if (!RABBITMQ_URL) {
-        throw new Error("RABBITMQ_URL is not defined in environment variables.");
-    }
-    const connection = await amqp.connect(RABBITMQ_URL);
-    channel = await connection.createChannel();
+// חיבור ל-RabbitMQ
+async function connect() {
+    const conn = await amqp.connect(RABBITMQ_URL);
+    channel = await conn.createChannel();
     await channel.assertQueue(QUEUE_NAME, { durable: true });
-    console.log('Connected to RabbitMQ (Cloud)');
-  } catch (error) {
-    console.error('Error connecting to RabbitMQ:', error);
-    process.exit(1);
-  }
+    console.log('Connected to RabbitMQ');
 }
 
-server.post('/api/events', async (request, reply) => {
-  try {
-    const eventData = request.body;
-    const message = JSON.stringify(eventData);
-
-    channel.sendToQueue(QUEUE_NAME, Buffer.from(message), { persistent: true });
-
-    console.log(`Event sent to ${QUEUE_NAME}:`, eventData);
-    reply.status(200).send({ message: 'Event sent successfully' });
-  } catch (error) {
-    console.error('Error sending event:', error);
-    reply.status(500).send({ message: 'Error sending event' });
-  }
+server.post('/api/events', async (req, reply) => {
+    channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(req.body)));
+    return { status: 'success' };
 });
 
 const start = async () => {
-  try {
-    await connectToRabbitMQ();
+    await connect();
     await server.listen({ port: 3000, host: '0.0.0.0' });
-    console.log('Server listening on http://localhost:3000');
-  } catch (err) {
-    console.error(err);
-    process.exit(1);
-  }
+    console.log('Server running on 3000');
 };
-
 start();

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Analytics Frontend</title>
+</head>
+<body>
+    <h1>Analytics Frontend</h1>
+    <button id="loginBtn">Login</button>
+    <button id="purchaseBtn">Purchase</button>
+
+    <script>
+        const trackEvent = async (userId, eventType, payload) => {
+            try {
+                const response = await fetch('/api/events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        event_type: eventType,
+                        payload: payload
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Server response:', data);
+            } catch (error) {
+                console.error('Error sending event:', error);
+            }
+        };
+
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            trackEvent('user123', 'login', { timestamp: new Date() });
+        });
+
+        document.getElementById('purchaseBtn').addEventListener('click', () => {
+            trackEvent('user123', 'purchase', { item: 'item_01', price: 99 });
+        });
+    </script>
+</body>
+</html>
