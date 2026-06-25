@@ -1,41 +1,26 @@
-import fastify from 'fastify';
-import amqp from 'amqplib';
+import http from 'http';
 import fs from 'fs';
 import path from 'path';
 
-const server = fastify();
+const htmlFilePath = path.join(__dirname, '../../frontend/index.html');
+const htmlContent = fs.readFileSync(htmlFilePath, 'utf8');
 
-// CORS
-server.addHook('preHandler', (req, reply, done) => {
-  reply.header('Access-Control-Allow-Origin', '*');
-  done();
+const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(htmlContent);
+  } else if (req.method === 'POST' && req.url === '/api/events') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'event received' }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+  }
 });
 
-// הגשת ה-HTML
-server.get('/', (req, reply) => {
-  return reply.type('text/html').send(fs.readFileSync(path.join(__dirname, '../../frontend/index.html')));
+const port = 3000;
+const host = '127.0.0.1';
+
+server.listen(port, host, () => {
+  console.log(`Server running at http://${host}:${port}/`);
 });
-
-const RABBITMQ_URL = process.env.RABBITMQ_URL || '';
-const QUEUE_NAME = 'events_queue';
-let channel: amqp.Channel;
-
-// חיבור ל-RabbitMQ
-async function connect() {
-    const conn = await amqp.connect(RABBITMQ_URL);
-    channel = await conn.createChannel();
-    await channel.assertQueue(QUEUE_NAME, { durable: true });
-    console.log('Connected to RabbitMQ');
-}
-
-server.post('/api/events', async (req, reply) => {
-    channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(req.body)));
-    return { status: 'success' };
-});
-
-const start = async () => {
-    await connect();
-    await server.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });
-    console.log('Server running on 3000');
-};
-start();
