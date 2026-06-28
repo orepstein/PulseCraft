@@ -17,13 +17,10 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-console.log("Successfully connected to Firebase/Firestore.");
-// --------------------------------
 
 // --- RabbitMQ Configuration ---
 const QUEUE_NAME = 'events_queue';
 const RABBITMQ_URL = process.env.RABBITMQ_URL;
-// --------------------------------
 
 async function startWorker() {
   if (!RABBITMQ_URL) {
@@ -39,20 +36,18 @@ async function startWorker() {
   channel.consume(QUEUE_NAME, async (msg) => {
     if (msg !== null) {
       const eventPayload = JSON.parse(msg.content.toString());
-      console.log(`[i] Received event of type: ${eventPayload.event_type}`);
 
       try {
         // Save the entire event payload to the 'events' collection in Firestore
-        const docRef = await db.collection('events').add(eventPayload);
-        
-        console.log(`[v] Event successfully saved to Firestore with document ID: ${docRef.id}`);
+        await db.collection('events').add(eventPayload);
         
         // Acknowledge the message so RabbitMQ removes it from the queue
         channel.ack(msg);
 
       } catch (error) {
-        console.error("[-] Error writing event to Firestore:", error);
-        // In case of an error, we reject the message without requeueing it
+        console.error("Error writing event to Firestore:", error);
+        
+        // In case of an error, reject the message without requeueing it
         // to prevent an infinite loop of failures.
         channel.nack(msg, false, false);
       }
