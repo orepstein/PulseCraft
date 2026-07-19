@@ -19,6 +19,17 @@
       "prisma.prisma"
     ];
 
+    # כאן הוספנו את הגדרת התצוגה המקדימה
+    previews = {
+      enable = true;
+      previews = {
+        web = {
+          command = [ "npm" "run" "dev" "--prefix" "frontend" "--" "--port" "$PORT" "--host" "0.0.0.0" ];
+          manager = "web";
+        };
+      };
+    };
+
     workspace = {
       onCreate = {
         install-deps = "npm i -C backend && npm i -C worker";

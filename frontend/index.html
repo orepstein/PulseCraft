@@ -1,43 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Analytics Frontend</title>
-</head>
-<body>
-    <h1>Analytics Frontend</h1>
-    <button id="loginBtn">Login</button>
-    <button id="purchaseBtn">Purchase</button>
-
-    <script>
-        const trackEvent = async (userId, eventType, payload) => {
-            try {
-                const response = await fetch('https://pulsecraft-api-free.onrender.com/api/events', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_id: userId,
-                        event_type: eventType,
-                        payload: payload
-                    })
-                });
-
-                const data = await response.json();
-                console.log('Server response:', data);
-            } catch (error) {
-                console.error('Error sending event:', error);
-            }
-        };
-
-        document.getElementById('loginBtn').addEventListener('click', () => {
-            trackEvent('user123', 'login', { timestamp: new Date() });
-        });
-
-        document.getElementById('purchaseBtn').addEventListener('click', () => {
-            trackEvent('user123', 'purchase', { item: 'item_01', price: 99 });
-        });
-    </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
