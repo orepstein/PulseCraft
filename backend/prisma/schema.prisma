@@ -1,0 +1,16 @@
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://user:@localhost:5432/analytics_db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Event {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  eventType String
+  payload   Json
+  createdAt DateTime @default(now())
+}
