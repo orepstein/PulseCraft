@@ -3,26 +3,29 @@ import { ReactFlow, Background, Controls, MiniMap } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { usePipelineStore } from '../pipelineStore';
 import ServiceNode from './ServiceNode';
+import SidePanel from './SidePanel';
 
 const nodeTypes = {
   customService: ServiceNode,
 };
 
 export default function PipeLineCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, startListening } = usePipelineStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, startListening, setSelectedNode } = usePipelineStore();
 
   useEffect(() => {
     startListening();
   }, [startListening]);
 
   return (
-    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#0f0f0f' }}>
+    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#0f0f0f', position: 'relative', overflow: 'hidden' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={(_, node) => setSelectedNode(node)} // תופס את הלחיצה ומעדכן את ה-Store
+        onPaneClick={() => setSelectedNode(null)} // סוגר את הפאנל בלחיצה על הרקע הריק
         nodeTypes={nodeTypes}
         fitView
       >
@@ -30,6 +33,9 @@ export default function PipeLineCanvas() {
         <Controls style={{ backgroundColor: '#fff', color: '#000' }} />
         <MiniMap nodeColor="#444" maskColor="rgba(0,0,0,0.8)" style={{ backgroundColor: '#1e1e1e' }} />
       </ReactFlow>
+      
+      {/* פאנל הצד המרחף - ירונדר רק אם יש קובייה נבחרת */}
+      <SidePanel />
     </div>
   );
 }

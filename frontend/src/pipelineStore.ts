@@ -16,21 +16,25 @@ const initialEdges: Edge[] = [
 interface PipelineState {
   nodes: Node[];
   edges: Edge[];
+  selectedNode: Node | null; // שומר את הקובייה שנבחרה
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
+  setSelectedNode: (node: Node | null) => void; // פונקציה לעדכון הבחירה
   startListening: () => void;
 }
 
 export const usePipelineStore = create<PipelineState>((set, get) => ({
   nodes: initialNodes,
   edges: initialEdges,
+  selectedNode: null,
   
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
   onConnect: (connection) => set({ edges: addEdge(connection, get().edges) }),
   setNodes: (nodes) => set({ nodes }),
+  setSelectedNode: (node) => set({ selectedNode: node }),
   
   startListening: () => {
     setInterval(async () => {
@@ -39,16 +43,22 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         if (!res.ok) throw new Error('Network error');
         const data = await res.json();
         
-        set((state) => ({
-          nodes: state.nodes.map(node => {
+        set((state) => {
+          const updatedNodes = state.nodes.map(node => {
             if (node.id === 'source-1') return { ...node, data: { ...node.data, status: data.rabbitStatus, metric: data.rabbitMetric } };
             if (node.id === 'processor-1') return { ...node, data: { ...node.data, status: data.workerStatus, metric: data.workerMetric } };
             if (node.id === 'db-1') return { ...node, data: { ...node.data, status: data.dbStatus, metric: data.dbMetric } };
             return node;
-          })
-        }));
+          });
+
+          // עדכון הנתונים בזמן אמת גם בתוך הפאנל הפתוח
+          const updatedSelectedNode = state.selectedNode 
+            ? updatedNodes.find(n => n.id === state.selectedNode!.id) || null 
+            : null;
+
+          return { nodes: updatedNodes, selectedNode: updatedSelectedNode };
+        });
       } catch (error) {
-        // צביעת כל הצמתים באדום במקרה של קריסת שרת
         set((state) => ({
           nodes: state.nodes.map(node => ({ ...node, data: { ...node.data, status: 'offline', metric: 'Server Disconnected' } }))
         }));
