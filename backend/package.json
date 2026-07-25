@@ -13,12 +13,16 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "amqplib": "^0.10.9",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "ioredis": "^5.11.1",
     "pg": "^8.22.0"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^20.19.43",
     "@types/pg": "^8.20.0",
     "prisma": "^5.22.0",
