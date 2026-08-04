@@ -19,7 +19,10 @@ export default function SidePanel() {
     
     setLogs(prev => [...prev, `[ACTION] Executing ${action}...`].slice(-6));
     try {
-      const res = await fetch(`/api/action/${action}`, { method: 'POST' });
+      // ניתוב הבקשה לנתיב המדויק שמוגדר בשרת ה-Backend
+      const endpoint = action === 'fire' ? '/api/trigger' : '/api/clear';
+      
+      const res = await fetch(endpoint, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setLogs(prev => [...prev, `[SUCCESS] ${data.message}`].slice(-6));
