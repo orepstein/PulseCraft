@@ -1,67 +1,88 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-interface StatsData {
-  totalEvents: number;
-  eventTypes: Record<string, string>;
+// הגדרת המבנה של הרשומה לפי ה-Prisma Schema שלנו
+interface EventData {
+  id: number;
+  userId: string;
+  eventType: string;
+  payload: any;
+  createdAt: string;
 }
 
-export const DashboardStats: React.FC = () => {
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStats = async () => {
-    try {
-      const response = await fetch('/api/stats');
-      if (!response.ok) {
-        throw new Error('Failed to fetch stats');
-      }
-      const data = await response.json();
-      setStats(data);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Connection error');
-    } finally {
-      setLoading(false);
-    }
-  };
+export function DashboardStats() {
+  const [stats, setStats] = useState<{ total: number; data: EventData[] }>({ total: 0, data: [] });
 
   useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 2000);
+    const fetchEvents = async () => {
+      try {
+        // ה-Proxy של Vite ינתב את הקריאה הזו ישירות לפורט 3000 של השרת שלך
+        const res = await fetch('/api/events');
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        const result = await res.json();
+        
+        if (result.success) {
+          setStats({ total: result.total, data: result.data });
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error fetching events:', error);
+      }
+    };
+
+    // שליפה ראשונית
+    fetchEvents();
+    
+    // הפעלת דגימה (Polling) כל 3 שניות לעדכון חי של המספרים והטבלה
+    const interval = setInterval(fetchEvents, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="text-gray-400 p-4">Loading live stats...</div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
-
   return (
-    <div className="bg-gray-900 text-white p-6 rounded-xl shadow-lg border border-gray-800">
-      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-        Real-Time Pipeline Stats (Redis)
-      </h2>
+    <div style={{ padding: '24px', backgroundColor: '#0d1117', borderRadius: '12px', border: '1px solid #30363d', color: '#c9d1d9', fontFamily: 'sans-serif' }}>
       
-      <div className="grid grid-cols-1 gap-4 mb-6">
-        <div className="bg-gray-800 p-4 rounded-lg">
-          <p className="text-sm text-gray-400">Total Events Processed</p>
-          <p className="text-3xl font-extrabold text-blue-400">{stats?.totalEvents || 0}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <h2 style={{ margin: 0, color: '#58a6ff', fontSize: '20px' }}>📊 Live Analytics Feed</h2>
+        <div style={{ backgroundColor: '#161b22', padding: '12px 24px', borderRadius: '8px', border: '1px solid #30363d', textAlign: 'center' }}>
+          <span style={{ display: 'block', fontSize: '12px', color: '#8b949e', textTransform: 'uppercase', marginBottom: '4px' }}>Total Processed</span>
+          <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#3fb950' }}>{stats.total.toLocaleString()}</span>
         </div>
       </div>
 
-      <h3 className="text-md font-semibold mb-2 text-gray-300">Event Types Breakdown</h3>
-      <div className="space-y-2 max-h-48 overflow-y-auto">
-        {stats?.eventTypes && Object.keys(stats.eventTypes).length > 0 ? (
-          Object.entries(stats.eventTypes).map(([type, count]) => (
-            <div key={type} className="flex justify-between items-center bg-gray-800 px-4 py-2 rounded">
-              <span className="font-mono text-sm text-indigo-300 truncate max-w-[180px]">{type}</span>
-              <span className="bg-indigo-600 px-2.5 py-0.5 rounded-full text-xs font-bold">{count}</span>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-gray-500">No event types recorded yet.</p>
-        )}
+      <div style={{ backgroundColor: '#161b22', borderRadius: '8px', border: '1px solid #30363d', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#21262d', borderBottom: '1px solid #30363d' }}>
+              <th style={{ padding: '12px 16px', color: '#8b949e', fontWeight: 'normal' }}>ID</th>
+              <th style={{ padding: '12px 16px', color: '#8b949e', fontWeight: 'normal' }}>Event Type</th>
+              <th style={{ padding: '12px 16px', color: '#8b949e', fontWeight: 'normal' }}>User ID</th>
+              <th style={{ padding: '12px 16px', color: '#8b949e', fontWeight: 'normal' }}>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.data.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: '#8b949e' }}>
+                  Waiting for events to arrive...
+                </td>
+              </tr>
+            ) : (
+              stats.data.map((ev) => (
+                <tr key={ev.id} style={{ borderBottom: '1px solid #30363d' }}>
+                  <td style={{ padding: '12px 16px', color: '#79c0ff' }}>#{ev.id}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <span style={{ backgroundColor: 'rgba(88,166,255,0.1)', color: '#58a6ff', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                      {ev.eventType}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', color: '#e6edf3' }}>{ev.userId}</td>
+                  <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: '13px' }}>
+                    {new Date(ev.createdAt).toLocaleTimeString()}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
-};
+}

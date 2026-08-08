@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import Redis from 'ioredis';
 import amqp from 'amqplib';
+import { PrismaClient } from '@prisma/client';
 
 dotenv.config();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 const port = process.env.PORT || 3000;
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
+const prisma = new PrismaClient(); // אתחול החיבור למסד הנתונים PostgreSQL
 
 // API לסטטיסטיקות מתוך ה-Redis
 app.get('/api/stats', async (req, res) => {
@@ -72,7 +74,7 @@ app.post('/api/trigger', async (req, res) => {
   }
 });
 
-// נתיב המדדים שה-Frontend מצפה לו עבור הקוביות בדשבורד (התוספת שלנו)
+// נתיב המדדים שה-Frontend מצפה לו עבור הקוביות בדשבורד
 app.get('/api/metrics', (req, res) => {
   res.json({
     rabbitStatus: 'online',
@@ -82,6 +84,32 @@ app.get('/api/metrics', (req, res) => {
     dbStatus: 'online',
     dbMetric: 'PostgreSQL Active'
   });
+});
+
+// API לשליפת נתונים בזמן אמת לדאשבורד (דרך Prisma)
+app.get('/api/events', async (req, res) => {
+  try {
+    // 1. ספירת סך כל האירועים במסד הנתונים
+    const totalEvents = await prisma.event.count();
+
+    // 2. שליפת 100 האירועים האחרונים בלבד (למניעת עומס על ה-UI)
+    const latestEvents = await prisma.event.findMany({
+      take: 100,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // 3. החזרת התשובה ל-Frontend
+    res.json({
+      success: true,
+      total: totalEvents,
+      data: latestEvents,
+    });
+  } catch (error) {
+    console.error('[Error] Failed to fetch events from Database:', error);
+    res.status(500).json({ success: false, message: 'Database connection failed' });
+  }
 });
 
 app.listen(port, () => {
